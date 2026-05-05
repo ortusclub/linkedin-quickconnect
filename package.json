@@ -1,0 +1,12 @@
+{
+  "name": "ortus-club-quickconnect",
+  "version": "2.2.0",
+  "private": true,
+  "description": "Ortus Club QuickConnect — LinkedIn outreach helper",
+  "scripts": {
+    "test": "jest --colors"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
