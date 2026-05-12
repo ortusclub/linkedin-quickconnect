@@ -1,5 +1,5 @@
 // Function to find a button-like element by visible text or aria-label and click it.
-const QUICKCONNECT_CONTENT_VERSION = "2.2";
+const QUICKCONNECT_CONTENT_VERSION = "2.3";
 const QUICKCONNECT_MESSAGE_SOURCE = `quickconnect:${QUICKCONNECT_CONTENT_VERSION}`;
 const RECOMMENDED_CHROME_MAJOR = 147;
 const MINIMUM_CHROME_MAJOR = 120;
@@ -1288,8 +1288,7 @@ async function smartConnectVmBrowser() {
             showQuickConnectStatus("Blocked right-panel Connect.", true);
             return false;
         }
-        showQuickConnectStatus("Connect clicked.");
-        return true;
+        return await verifyConnectClickedOwner();
     }
 
     const moreButton = findProfileActionButton(['More actions', 'More', 'More options', 'See more actions'], { exact: true, intent: "more" }) ||
@@ -1309,8 +1308,56 @@ async function smartConnectVmBrowser() {
     }
 
     const clicked = await clickOpenProfileMenuActionWithRetry(moreButton, ['Connect'], { exact: true, intent: "connect" });
-    showQuickConnectStatus(clicked ? "Connect clicked." : "Connect action not found.", !clicked);
-    return clicked;
+    if (!clicked) {
+        showQuickConnectStatus("Connect action not found.", true);
+        return false;
+    }
+    return await verifyConnectClickedOwner();
+}
+
+// After clicking what we think is the profile owner's Connect button,
+// LinkedIn always pops the "Add a note to your invitation?" modal as a
+// confirmation step. If that modal does NOT appear within MODAL_WAIT_MS,
+// we silently fired a click on a non-profile-owner button (e.g. a Follow
+// button on a sidebar recommendation card) — surface a red error toast
+// instead of pretending it worked, so the operator knows to recover.
+const INVITATION_MODAL_WAIT_MS = 1500;
+async function verifyConnectClickedOwner() {
+    const start = Date.now();
+    while (Date.now() - start < INVITATION_MODAL_WAIT_MS) {
+        const modal = findInvitationModal();
+        if (modal) {
+            const name = extractInviteeNameFromModal(modal);
+            showQuickConnectStatus(name ? `Invitation modal opened for ${name}.` : "Invitation modal opened.");
+            return true;
+        }
+        await sleep(80);
+    }
+    showQuickConnectStatus("No invitation modal — Alt+C may have clicked the wrong button. Verify and retry.", true);
+    return false;
+}
+
+function findInvitationModal() {
+    const candidates = document.querySelectorAll('[role="dialog"], .artdeco-modal');
+    for (const el of candidates) {
+        if (!isVisibleElement(el)) continue;
+        const text = (el.innerText || '').toLowerCase();
+        // LinkedIn's invitation-confirmation modal uses one of these
+        // English copy variants; match on a phrase common to all of them.
+        if (text.includes('add a note to your invitation') ||
+            text.includes('personalize your invitation') ||
+            text.includes('send without a note')) {
+            return el;
+        }
+    }
+    return null;
+}
+
+function extractInviteeNameFromModal(modal) {
+    // Copy template: "Personalize your invitation to <Name> by adding a note."
+    const text = modal.innerText || '';
+    const m = text.match(/invitation to ([^\n.]+?)(?: by adding| by | \.)/i);
+    return m ? m[1].trim() : '';
 }
 
 function findNormalPrimaryProfileButton(possibleTexts, options = {}) {
