@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ortus Club QuickConnect",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "LinkedIn outreach helper for Ortus Club operators — personalised connection notes from a Google Sheet, triggered by keystroke.",
   "permissions": ["storage", "scripting"],
   "host_permissions": ["https://docs.google.com/*", "*://*.linkedin.com/*"],

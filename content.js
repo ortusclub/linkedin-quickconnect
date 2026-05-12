@@ -1,5 +1,5 @@
 // Function to find a button-like element by visible text or aria-label and click it.
-const QUICKCONNECT_CONTENT_VERSION = "2.1";
+const QUICKCONNECT_CONTENT_VERSION = "2.2";
 const QUICKCONNECT_MESSAGE_SOURCE = `quickconnect:${QUICKCONNECT_CONTENT_VERSION}`;
 const RECOMMENDED_CHROME_MAJOR = 147;
 const MINIMUM_CHROME_MAJOR = 120;
@@ -552,34 +552,44 @@ function isUnsafeRightPanelTarget(element) {
     if (!element) return true;
     if (isSidebarElement(element)) return true;
 
-    const rect = element.getBoundingClientRect();
-    const appearsInRightRail = rect.left >= Math.max(window.innerWidth * 0.58, 860);
-
+    // DOM-structure check only — no viewport math, no zoom/width
+    // assumptions. The previous `rect.left >= innerWidth * 0.58`
+    // heuristic rejected legitimate Connect buttons on wide monitors,
+    // narrow windows, and after page reflow. Use known LinkedIn right-
+    // rail container selectors instead. `.pv-profile-sticky-header` is
+    // intentionally NOT in this list: when the operator has scrolled
+    // past the top card the sticky header IS the primary Connect.
     if (element.closest([
         ".scaffold-layout__aside",
         ".scaffold-layout__sidebar",
-        ".pv-profile-sticky-header",
         ".ad-banner-container",
         '[aria-label*="People also viewed"]',
         '[aria-label*="People you may know"]',
-        '[aria-label*="Similar profiles"]'
+        '[aria-label*="Similar profiles"]',
+        '[aria-label*="More profiles for you"]',
+        '[aria-label*="Other profiles viewed"]'
     ].join(","))) {
         return true;
     }
 
-    if (!appearsInRightRail) return false;
-
+    // Safety net: walk up to the nearest card/section. If the card
+    // advertises itself as a suggestion/recommendation list, reject
+    // any button inside it. Runs unconditionally so we catch right-
+    // rail cards that don't wear one of the structural classes above.
     const card = element.closest("section, article, aside, [role='complementary']");
-    const cardText = normalizeButtonText(card?.innerText || card?.textContent);
-    const rightPanelLabels = [
-        "people also viewed",
-        "people you may know",
-        "similar profiles",
-        "more profiles for you",
-        "other profiles viewed"
-    ];
+    if (card) {
+        const cardText = normalizeButtonText(card.innerText || card.textContent);
+        const rightPanelLabels = [
+            "people also viewed",
+            "people you may know",
+            "similar profiles",
+            "more profiles for you",
+            "other profiles viewed"
+        ];
+        if (rightPanelLabels.some((label) => cardText.includes(label))) return true;
+    }
 
-    return rightPanelLabels.some((label) => cardText.includes(label));
+    return false;
 }
 
 function isProfileOwnedAction(element, context = {}) {
